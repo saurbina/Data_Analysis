@@ -8,7 +8,7 @@ editor: visual
 ```{r}
 library(tidyverse)
 library(ggplot2)
-setwd("/Volumes/TOSHIBA EXT/0.1 Thesis/data/output")
+setwd("/~/0.1 Thesis/data/output")
 df1 <- read.csv("mset.var_V_01.csv")
 df1 <- df1 %>%
 mutate(AGE = edad)

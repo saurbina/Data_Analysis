@@ -54,9 +54,9 @@ version = 'V_01'
 
 df1 <- read.csv("mset.var_V_01.csv")
 
-df_women <- read_xlsx('/Volumes/TOSHIBA EXT/0.1 Thesis/data/poblacion_perc.xlsx')
-df_educ <- read_xlsx('/Volumes/TOSHIBA EXT/0.1 Thesis/data/educ_reg.xlsx')
-v_prev <- read_xlsx('/Volumes/TOSHIBA EXT/0.1 Thesis/data/v_prev.xlsx')
+df_women <- read_xlsx('/~/0.1 Thesis/data/poblacion_perc.xlsx')
+df_educ <- read_xlsx('/~/0.1 Thesis/data/educ_reg.xlsx')
+v_prev <- read_xlsx('/~Thesis/data/v_prev.xlsx')
 
 # ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
 # ::::::::::::::::::::::::: SEE DATA  :::::::::::::::::::::::::::::::::

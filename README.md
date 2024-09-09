@@ -34,8 +34,3 @@ This project is designed to cover a variety of data analysis techniques, includi
         - `requirements.txt`: Dependencies for poststratification.
 
 
-For any questions or inquiries, please contact:
-
-- **Email:** your.email@example.com
-- **GitHub:** [yourusername](https://github.com/yourusername)
-

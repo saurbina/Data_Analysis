@@ -1,0 +1,773 @@
+# #######################################################################
+# File-Name: Models_V3.R
+# Version: R 3.3.1
+# Date: Mar 18, 2024
+# Author: Sebastian Urbina Julio
+# Purpose:
+# Input Files: mset.var_V_01.csv
+# Output Files:
+# Data Output:
+# Previous files:
+# Dependencies:
+# Required by: NONE
+# Status: 
+# Machine: personal laptop
+# #######################################################################
+
+# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# ::::::::::::::::::::::::: SOME GLOBAL DEFINITIONS ::::::::::::::::::::::::::::
+
+
+setwd("/Volumes/TOSHIBA EXT/0.1 Thesis/data/output")
+
+
+packages <- c('backports', 'effects', 'interactions', 'lmerTest', 'psych', 'jtools', 'ggstance', 'devtools', 'lattice')
+
+# Install packages not yet installed
+installed_packages <- packages %in% rownames(installed.packages())
+if (any(installed_packages == FALSE)) {
+  install.packages(packages[!installed_packages])
+}
+
+# Packages loading
+invisible(lapply(packages, library, character.only = TRUE))
+
+library(dotwhisker)
+library(sjPlot)
+library(tidyverse)
+library(readxl)
+library(ggplot2)
+library(Matrix)
+library(lme4)
+library(rstanarm )
+library(modelsummary)
+library(tinytable)
+library(QMSS)
+library(webshot)
+library(stringr)
+library(gridExtra)
+
+
+
+
+version = 'V_01'
+
+df1 <- read.csv("mset.var_V_01.csv")
+
+df_women <- read_xlsx('/Volumes/TOSHIBA EXT/0.1 Thesis/data/poblacion_perc.xlsx')
+df_educ <- read_xlsx('/Volumes/TOSHIBA EXT/0.1 Thesis/data/educ_reg.xlsx')
+v_prev <- read_xlsx('/Volumes/TOSHIBA EXT/0.1 Thesis/data/v_prev.xlsx')
+
+# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# ::::::::::::::::::::::::: SEE DATA  :::::::::::::::::::::::::::::::::
+View(df1)
+
+df_women <- df_women[, c("Reg", "Descripción series","women_perc", "men_perc")]
+names(df_women)[names(df_women) == "Descripción series"] <- "Descripción_series"
+df_women <- subset(df_women, Reg != 1)
+df_women$Descripción_series <- str_trim(df_women$Descripción_series)
+
+
+df_educ <- df_educ[, c("Desagregación", "2020")]
+df_educ <- subset(df_educ, Desagregación != 'Total país')
+
+
+
+
+df_educ <- df_educ %>%
+  mutate(region_name = case_when(
+    `Desagregación` == 'Tarapacá' ~ "region de tarapaca",
+    `Desagregación` == 'Antofagasta' ~ "region de antofagasta",
+    `Desagregación` == 'Atacama' ~ "region de atacama",
+    `Desagregación` == 'Coquimbo' ~ "region de coquimbo",
+    `Desagregación` == 'Valparaíso' ~ "region de valparaiso",
+    `Desagregación` == "O'Higgins" ~ "region del libertador gral. bernardo o'higgins",
+    `Desagregación` == 'Maule' ~ "region del maule",
+    `Desagregación` == 'Biobío' ~ "region del biobio",
+    `Desagregación` == 'Araucanía' ~ "region de la araucania",
+    `Desagregación` == 'Los Lagos' ~ "region de los lagos",
+    `Desagregación` == 'Aysén' ~ "region de aysen del gral. carlos ibanez del campo",
+    `Desagregación` == 'Magallanes' ~ "region de magallanes y de la antartica chilena",
+    `Desagregación` == 'Metropolitana' ~ "region metropolitana de santiago",
+    `Desagregación` == 'Los Ríos' ~ "region de los rios",
+    `Desagregación` == 'Arica y Parinacota' ~ "region de arica y parinacota",
+    `Desagregación` == 'Ñuble' ~ "region de nuble",
+    TRUE ~ NA
+  ))
+
+
+df_women <- df_women %>%
+  mutate(region_name = case_when(
+    Descripción_series == 'Región de Tarapacá' ~ "region de tarapaca",
+    Descripción_series == 'Región de Antofagasta' ~ "region de antofagasta",
+    Descripción_series == 'Región de Atacama' ~ "region de atacama",
+    Descripción_series == 'Región de Coquimbo' ~ "region de coquimbo",
+    Descripción_series == 'Región de Valparaíso' ~ "region de valparaiso",
+    Descripción_series == "Región del Libertador General Bernardo O'Higgins" ~ "region del libertador gral. bernardo o'higgins",
+    Descripción_series == 'Región del Maule' ~ "region del maule",
+    Descripción_series == 'Región del Biobío' ~ "region del biobio",
+    Descripción_series == 'Región de La Araucanía' ~ "region de la araucania",
+    Descripción_series == 'Región de Los Lagos' ~ "region de los lagos",
+    Descripción_series == 'Región de Aysén del General Carlos Ibáñez del Campo' ~ "region de aysen del gral. carlos ibanez del campo",
+    Descripción_series == 'Región de Magallanes y la Antártica Chilena' ~ "region de magallanes y de la antartica chilena",
+    Descripción_series == 'Región Metropolitana' ~ "region metropolitana de santiago",
+    Descripción_series == 'Región de Los Ríos' ~ "region de los rios",
+    Descripción_series == 'Región de Arica y Parinacota' ~ "region de arica y parinacota",
+    Descripción_series == 'Región de Ñuble' ~ "region de nuble",
+    TRUE ~ NA
+  ))
+
+df_women <- df_women[, c("region_name","women_perc", "men_perc")]
+df_educ <- df_educ[, c("region_name", "2020")]
+
+# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# ::::::::::::::::::::::::: MUTATE VARIABLES  ::::::::::::::::::::::::::::::::::
+df1 <- df1 %>%
+mutate(AGE = edad)
+
+df1 <- df1 %>%
+  mutate(education = ifelse(esc_nivel_1 == 99, NA, esc_nivel_1))
+
+df1 <- df1 %>%
+mutate(Percentage_k = percentage_k * 100)
+
+df1 <- df1 %>%
+mutate(gse_m = case_when(
+    gse_t == "ABC1" ~ "ABC1-C2",
+    gse_t == "C3" ~ "C3",
+    gse_t == "D_E" ~ "DE",
+    TRUE ~ NA
+  ))
+
+df1 <-  df1 %>%
+  mutate(y_b = case_when(
+    y == 0  ~ 1,
+    y == 1  ~ 0,
+    TRUE ~ NA
+  ))
+
+
+v_prev <- v_prev %>%
+  mutate(v_prevl = round(v_prevl,2)/100)
+# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# ::::::::::::::::::::::::: MERGE DATA  :::::::::::::::::::::::::::::::::
+
+df1 <- df1 %>%
+  left_join(df_women, by = "region_name")
+
+df1 <- df1 %>%
+  left_join(df_educ, by = "region_name")
+
+df1 <- df1 %>%
+  left_join(v_prev, by = "region_name")
+
+names(df1)[names(df1) == "2020"] <- "avg_educ"
+
+# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# ::::::::::::::::::::::::: LINEAR REGRESSION  :::::::::::::::::::::::::::::::::
+
+lg_m1 <- lm(percentage_b ~ income_household_avr + women_perc + avg_educ, data = df1)
+summary(lg_m1)
+
+
+# this is predicted line comparing only chosen variables
+ggplot(data = df1, aes(x = avg_educ, y = percentage_b)) + 
+  geom_point(color='blue') +
+  geom_smooth(method = "lm", se = TRUE, color = 'red') + 
+  labs(
+    title = "Left-wing candidate vote share and average education",
+    x = "Average education", 
+    y = "Vote share %"
+  )
+
+
+
+# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# ::::::::::::::::::::::::: LOGISTIC REGRESSION INCOME::::::::::::::::::::::::::::::::
+
+regions_to_exclude <- c('region de arica y parinacota', 'region de tarapaca', 
+                        'region de atacama', 'region de aysen del gral. carlos ibanez del campo', 
+                        'region de magallanes y de la antartica chilena')
+
+df2 <- df1 %>%
+  filter(!(region_name %in% regions_to_exclude))
+
+
+model0 <- glm(y_b ~ gse_t + female + AGE , data = df2, family = binomial(link = "logit"))
+summary(model0)
+temp_html_file <- tempfile(fileext = ".html")
+tab_model(model0, transform = NULL, file = temp_html_file)
+
+# Convert the HTML summary table to a PNG file using webshot
+png_file_path = "lg_model.png"  # Specify the PNG file path
+
+# Capture the HTML file as a PNG image
+webshot(temp_html_file, png_file_path)
+
+#on average, the odds of 
+exp(coef(model0)) - 1
+
+newdata_gs <- with(df1, data.frame(AGE = 18:100, gse_t = factor(c("ABC1")), female = 1))
+preds_gs <- predict(model0, newdata_gs, type = "response", se.fit = TRUE)
+preds_gs1 <- preds_gs$fit # predicted
+lower_gs <- preds_gs$fit - (1.96 * preds_gs$se.fit) # lower bounds
+upper_gs <- preds_gs$fit + (1.96 * preds_gs$se.fit) # upper bound
+
+newdata_c2 <- with(df1, data.frame(AGE = 18:100, gse_t = factor(c("C2")), female = 1))
+preds_c2 <- predict(model0, newdata_c2, type = "response", se.fit = TRUE)
+preds_c <- preds_c2$fit # predicted
+lower_c2 <- preds_c2$fit - (1.96 * preds_c2$se.fit) # lower bounds
+upper_c2 <- preds_c2$fit + (1.96 * preds_c2$se.fit) # upper bound
+
+newdata_c3 <- with(df1, data.frame(AGE = 18:100, gse_t = factor(c("C3")), female = 1))
+preds_c3 <- predict(model0, newdata_c3, type = "response", se.fit = TRUE)
+preds_3 <- preds_c3$fit # predicted
+lower_c3 <- preds_c3$fit - (1.96 * preds_c3$se.fit) # lower bounds
+upper_c3 <- preds_c3$fit + (1.96 * preds_c3$se.fit) # upper bound
+
+
+newdata_de <- with(df1, data.frame(AGE = 18:100, gse_t = factor(c("D_E")), female = 1))
+preds_de <- predict(model0, newdata_de, type = "response", se.fit = TRUE)
+preds_d <- preds_de$fit # predicted
+lower_de <- preds_de$fit - (1.96 * preds_de$se.fit) # lower bounds
+upper_de <- preds_de$fit + (1.96 * preds_de$se.fit) # upper bound
+
+################################ MALE ##########################################
+
+newdata_gsm <- with(df1, data.frame(AGE = 18:100, gse_t = factor(c("ABC1")), female = 0))
+preds_gsm <- predict(model0, newdata_gsm, type = "response", se.fit = TRUE)
+preds_gs1m <- preds_gsm$fit # predicted
+lower_gsm <- preds_gsm$fit - (1.96 * preds_gsm$se.fit) # lower bounds
+upper_gsm <- preds_gsm$fit + (1.96 * preds_gsm$se.fit) # upper bound
+
+newdata_c2m <- with(df1, data.frame(AGE = 18:100, gse_t = factor(c("C2")), female = 0))
+preds_c2m <- predict(model0, newdata_c2m, type = "response", se.fit = TRUE)
+preds_cm <- preds_c2$fit # predicted
+lower_c2m <- preds_c2m$fit - (1.96 * preds_c2m$se.fit) # lower bounds
+upper_c2m <- preds_c2m$fit + (1.96 * preds_c2m$se.fit) # upper bound
+
+newdata_c3m <- with(df1, data.frame(AGE = 18:100, gse_t = factor(c("C3")), female = 0))
+preds_c3m <- predict(model0, newdata_c3m, type = "response", se.fit = TRUE)
+preds_3m <- preds_c3m$fit # predicted
+lower_c3m <- preds_c3m$fit - (1.96 * preds_c3m$se.fit) # lower bounds
+upper_c3m <- preds_c3m$fit + (1.96 * preds_c3m$se.fit) # upper bound
+
+
+newdata_dem <- with(df1, data.frame(AGE = 18:100, gse_t = factor(c("D_E")), female = 0))
+preds_dem <- predict(model0, newdata_dem, type = "response", se.fit = TRUE)
+preds_dm <- preds_dem$fit # predicted
+lower_dem <- preds_dem$fit - (1.96 * preds_dem$se.fit) # lower bounds
+upper_dem <- preds_dem$fit + (1.96 * preds_dem$se.fit) # upper bound
+
+
+# Create a 2x2 layout for the plots
+par(mfrow = c(2, 4))
+plot(18:100, preds_gs1, type="l", ylab="Predicted Probability to vote Left-candidate", xlab="Age", bty="n", col = "blue", ylim = c(0, 1))
+title(main = "Female", line = -1.5) 
+title(main = "Probability of Voting for the Left Candidate\nby Age and Socioeconomic Status (ABC1)")
+lines(18:100, lower_gs, lty=2, col = "blue")
+lines(18:100, upper_gs, lty=2, col = "blue")
+
+plot(18:100, preds_c, type="l", ylab="Predicted Probability to vote Left-candidate", xlab="Age", bty="n", col = "blue", ylim = c(0, 1))
+title(main = "Female", line = -1.5) 
+title(main = "Probability of Voting for the Left Candidate\nby Age and Socioeconomic Status (C2)")
+lines(18:100, lower_c2, lty=2, col = "blue")
+lines(18:100, upper_c2, lty=2, col = "blue")
+
+plot(18:100, preds_3, type="l", ylab="Predicted Probability to vote Left-candidate", xlab="Age", bty="n", col = "blue", ylim = c(0, 1))
+title(main = "Female", line = -1.5) 
+title(main = "Probability of Voting for the Left Candidate\nby Age and Socioeconomic Status (C3)")
+lines(18:100, lower_c3, lty=2, col = "blue")
+lines(18:100, upper_c3, lty=2, col = "blue")
+
+plot(18:100, preds_d, type="l", ylab="Predicted Probability to vote Left-candidate", xlab="Age", bty="n", col = "blue", ylim = c(0, 1))
+title(main = "Female", line = -1.5) 
+title(main = "Probability of Voting for the Left Candidate\nby Age and Socioeconomic Status (DE)")
+lines(18:100, lower_de, lty=2, col = "blue")
+lines(18:100, upper_de, lty=2, col = "blue")
+
+plot(18:100, preds_gs1m, type="l", ylab="Predicted Probability to vote Left-candidate", xlab="Age", bty="n", col = "red", ylim = c(0, 1))
+title(main = "Male", line = -1.5) 
+title(main = "Probability of Voting for the Left Candidate\nby Age and Socioeconomic Status (ABC1)")
+lines(18:100, lower_gsm, lty=2, col = "red")
+lines(18:100, upper_gsm, lty=2, col = "red")
+
+plot(18:100, preds_cm, type="l", ylab="Predicted Probability to vote Left-candidate", xlab="Age", bty="n", col = "red", ylim = c(0, 1))
+title(main = "Male", line = -1.5) 
+title(main = "Probability of Voting for the Left Candidate\nby Age and Socioeconomic Status (C2)")
+lines(18:100, lower_c2m, lty=2, col = "red")
+lines(18:100, upper_c2m, lty=2, col = "red")
+
+plot(18:100, preds_3m, type="l", ylab="Predicted Probability to vote Left-candidate", xlab="Age", bty="n", col = "red", ylim = c(0, 1))
+title(main = "Male", line = -1.5) 
+title(main = "Probability of Voting for the Left Candidate\nby Age and Socioeconomic Status (C3)")
+lines(18:100, lower_c3m, lty=2, col = "red")
+lines(18:100, upper_c3m, lty=2, col = "red")
+
+plot(18:100, preds_dm, type="l", ylab="Predicted Probability to vote Left-candidate", xlab="Age", bty="n", col = "red", ylim = c(0, 1))
+title(main = "Male", line = -1.5) 
+title(main = "Probability of Voting for the Left Candidate\nby Age and Socioeconomic Status (DE)")
+lines(18:100, lower_dem, lty=2, col = "red")
+lines(18:100, upper_dem, lty=2, col = "red")
+par(cex.axis = 0.8)
+
+
+
+# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# ::::::::::::::::::::::::: LOGISTIC REGRESSION Education:::::::::::::::::::::::
+model1 <- glm(y_b ~ education + female + AGE , data = df2, family = binomial(link = "logit"))
+summary(model1)
+
+exp(coef(model1))
+
+temp_html_file <- tempfile(fileext = ".html")
+tab_model(model1, transform = NULL, file = temp_html_file)
+
+# Convert the HTML summary table to a PNG file using webshot
+png_file_path = "lg_model.png"  # Specify the PNG file path
+
+# Capture the HTML file as a PNG image
+webshot(temp_html_file, png_file_path)
+
+#on average, the odds of 
+exp(coef(model1)) - 1
+exp(confint(model1))
+
+#Predicted probabilities
+newdata <- with(df1, data.frame(AGE = c(20, 60), education=mean(education, na.rm=TRUE), female=1))
+predict(model1, newdata, type="response")
+
+
+newdata2 <- with(df1, data.frame(AGE = mean(AGE, na.rm=TRUE), education = c(0:10), female=1))
+newdata3 <- with(df1, data.frame(AGE = mean(AGE, na.rm=TRUE), education = c(0:10), female=0))
+
+preds <- predict(model1, newdata2, type="response", se.fit=TRUE)
+preds2 <- predict(model1, newdata3, type="response", se.fit=TRUE)
+
+
+predf <- preds$fit # predicted
+lower <- preds$fit - (1.96*preds$se.fit) # lower bounds
+upper <- preds$fit + (1.96*preds$se.fit) # upper bounds
+
+predf2 <- preds2$fit # predicted
+lower2 <- preds2$fit - (1.96*preds2$se.fit) # lower bounds
+upper2 <- preds2$fit + (1.96*preds2$se.fit) # upper bounds
+
+par(mfrow = c(1, 2))
+plot(0:10, predf, type="l", ylab="Predicted Probability to vote Left-candidate", xlab="Education", bty="n", col = "blue", ylim = c(0, 1))
+title(main = "Probability of Voting for the Left Candidate\nby Education (Female)")
+lines(0:10, lower, lty=2, col = "blue")
+lines(0:10, upper, lty=2, col = "blue")
+
+
+plot(0:10, predf2, type="l", ylab="Predicted Probability to vote Left-candidate", xlab="Education", bty="n", col = "red", ylim = c(0, 1))
+title(main = "Probability of Voting for the Left Candidate \nby Education (Male)")
+lines(0:10, lower2, lty=2, col = "red")
+lines(0:10, upper2, lty=2, col = "red")
+# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# ::::::::::::::::::::::::: LINEAR REGRESSION BY REGION ::::::::::::::::::::::::::::::::
+
+lm_status <- df2 %>% group_by(region_name) %>%
+  do(tidy(glm(y_b ~ gse_t  +female + AGE ,data = .))) %>%
+  ungroup %>% mutate(model = region_name)
+
+lm_status2 <- df2 %>% group_by(region_name) %>%
+  do(tidy(glm(y_b ~ education  +female + AGE ,data = .))) %>%
+  ungroup %>% mutate(model = region_name)
+
+# Generate a 'secret weapon' plot of the results of diamond size
+region_labels <- c("region de arica y parinacota" = "AP", "region de tarapaca" = "TA", "region de antofagasta" = "AN",
+                   "region de atacama" = "AT", "region de coquimbo" = "CO", "region de valparaiso" = "VA",
+                   "region metropolitana de santiago" = "RM", "region del libertador gral. bernardo o'higgins" = "LI",
+                   "region del maule" = "ML", "region de nuble" = "NB", "region del biobio" = "BI", 
+                   "region de la araucania" = "AR", "region de los rios" = "LR", "region de los lagos" = "LL",
+                   "region de aysen del gral. carlos ibanez del campo" = "AI", "region de magallanes y de la antartica chilena" = "MA")
+
+
+plot0 <- secret_weapon(lm_status2, var = "education") +
+  xlab("Estimated Coefficient (education)") + ylab("Region name") +
+  ggtitle("Estimates for education across regions") +
+  theme(plot.title = element_text(size = 6, face = "bold"),
+        axis.title.x = element_text(size = 6),
+        axis.title.y = element_text(size = 6),
+        axis.text.x = element_text(size = 6, angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 6)) +
+  scale_y_discrete(labels = region_labels) +
+  coord_flip()
+
+
+
+secret_weapon(lm_status, var = "AGE") +
+  xlab("Estimated Coefficient (Age)") + ylab("Region name") +
+  ggtitle("Estimates for Age across regions") +
+  theme(plot.title = element_text(face = "bold"),
+        axis.text.x = element_text(size = 7, angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 8)) +
+  scale_y_discrete(labels = region_labels) +
+  coord_flip()
+
+
+secret_weapon(lm_status, var = "female") +
+  xlab("Estimated Coefficient (female)") + ylab("Region name") +
+  ggtitle("Estimates for gender(female) across regions") +
+  theme(plot.title = element_text(face = "bold"),
+        axis.text.x = element_text(size = 7, angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 8)) +
+  scale_y_discrete(labels = region_labels) +
+  coord_flip()
+
+
+
+plot1 <- secret_weapon(lm_status, var = "gse_tC2") +
+  xlab("Estimated Coefficient (C2)") + ylab("Region name") +
+  ggtitle("Estimates for 'C2' socioeconomic status across regions") +
+  theme(plot.title = element_text(size = 6, face = "bold"),
+        axis.title.x = element_text(size = 6),
+        axis.title.y = element_text(size = 6),
+        axis.text.x = element_text(size = 6, angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 6)) +
+  scale_y_discrete(labels = region_labels) +
+  coord_flip()
+
+plot2 <- secret_weapon(lm_status, var = "gse_tC3") +
+  xlab("Estimated Coefficient (C3)") + ylab("Region name") +
+  ggtitle("Estimates for 'C3' socioeconomic status across regions") +
+  theme(plot.title = element_text(size = 6, face = "bold"),
+        axis.title.x = element_text(size = 6),
+        axis.title.y = element_text(size = 6),
+        axis.text.x = element_text(size = 6, angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 6)) +
+  scale_y_discrete(labels = region_labels) +
+  coord_flip()
+
+
+plot3 <- secret_weapon(lm_status, var = "gse_tD_E") +
+  xlab("Estimated Coefficient (DE)") + ylab("Region name") +
+  ggtitle("Estimates for 'DE'\nsocioeconomic status across regions") +
+  theme(plot.title = element_text(size = 6, face = "bold"),
+        axis.title.x = element_text(size = 6),
+        axis.title.y = element_text(size = 6),
+        axis.text.x = element_text(size = 6, angle = 45, hjust = 1),
+        axis.text.y = element_text(size = 6)) +
+  scale_y_discrete(labels = region_labels) +
+  coord_flip()
+
+combined_plot <- grid.arrange(plot1, plot2, plot3, plot0, ncol = 2, nrow = 2)
+main_title <- textGrob("Figure Nº3: Estimates Coefficients by region", gp = gpar(fontsize = 10),just = "right")
+combined_plot_with_title_and_caption <- grid.arrange(
+  arrangeGrob(main_title, combined_plot, heights = c(0.1, 0.9))
+)
+
+# ::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::::
+# ::::::::::::::::::::::::: MULTILEVEL ANALYSIS ::::::::::::::::::::::::::::::::
+
+# ::::::::::::::::::::::::: EMPTY RAMDOM INTERCEPT ANALYSIS ::::::::::::::::::::::::::::::::
+model_rsl <- glmer(y_b ~ (1 |region_name), data = df2, 
+                   family = binomial(link = "logit"))
+print(model_rsl)
+
+
+# ::::::::::::::::::: RAMDOM INTERCEPT ANALYSIS + INDIV VARIABLE INCOME:::::::::::::
+
+model_rsl1 <- glmer(y_b ~ gse_t + (1 |region_name), data = df2,
+                   family = binomial(link = "logit"))
+print(model_rsl1)
+ranef(model_rsl1)
+
+# ::::::::::::::::::: RAMDOM INTERCEPT ANALYSIS + INDIV VARIABLE EDUC  :::::::::::::
+model_rsl2 <- glmer(y_b ~ education + (1 |region_name),  data = df2,
+                    family = binomial(link ="logit"))
+print(model_rsl2)
+ranef(model_rsl2)
+
+# ::::::::::::::::::: RAMDOM INTERCEPT ANALYSIS + INDIV :::::::::::::
+
+model_rsl3 <- glmer(y_b ~ gse_t + AGE + female  + (1 |region_name), 
+                    data = df2, family = binomial(link ="logit"))
+summary(model_rsl3)
+ranef(model_rsl3)
+# ::::::::::::::::::: RAMDOM INTERCEPT ANALYSIS + INDIV :::::::::::::
+model_rsl4 <- glmer(y_b ~ education + AGE + female  + (1 |region_name), 
+                    data = df2, family = binomial(link ="logit"))
+summary(model_rsl4, corr = FALSE)
+ranef(model_rsl4)
+
+# ::::::::::::::::::: RAMDOM INTERCEPT & SLOPE ANALYSIS + INDIV :::::::::::::
+
+model_rsl5 <- glmer(y_b ~ gse_t + (1 + avg_educ|region_name), family = binomial(link ="logit"), 
+                    data = df2)
+summary(model_rsl5, corr = FALSE)
+ranef(model_rsl5)
+
+
+model_rsl8 <- glmer(y_b ~ education + gse_t + v_prevl + (1 |region_name), family = binomial(link ="logit"), 
+                    data = df2)
+summary(model_rsl8, corr = FALSE)
+ranef(model_rsl8)
+fixef(model_rsl8)
+
+
+# ::::::::::::::::::: RAMDOM INTERCEPT & SLOPE ANALYSIS + INDIV :::::::::::::
+model_rsl6 <- glmer(y_b ~ education + AGE + v_prevl + avg_educ  + (1 + education|region_name), 
+                    family = binomial(link ="logit"), data = df2)
+summary(model_rsl6, corr = FALSE)
+ranef(model_rsl6)
+
+
+model_rsl7 <- glmer(y_b ~ gse_t + AGE + avg_educ + v_prevl + (1 |region_name), 
+                    family = binomial(link ="logit"), data = df2)
+summary(model_rsl7, corr = FALSE)
+ranef(model_rsl7)
+
+
+
+
+
+# ::::::::::::::::::: RAMDOM INTERCEPT & SLOPE ANALYSIS + INDIV FINAL:::::::::::::
+
+model_rslf <- glmer(y_b ~ gse_t + education + female + AGE + avg_educ +  v_prevl  + (1 + gse_t + education|region_name), 
+                    family = binomial(link ="logit"), data = df2)
+summary(model_rslf, corr = FALSE)
+ranef(model_rslf)
+fixef(model_rslf)
+
+
+# Predict linear predictor and random effects
+linpred <- predict(model_rslf, type = "link")
+a.state <- ranef(model_rslf)$region_name
+displayed.states <- unique(df2$region_name)
+region_names <- rownames(a.state)
+y_values <- df2$y_b
+
+par(mfrow = c(3, 4))
+for (j in seq_along(region_names)) {  
+  plot(0, 0, xlim = range(linpred), ylim = c(0, 1), yaxs = "i",
+       xlab = "linear predictor", ylab = "Pr (vote left candidate)",
+       main = region_names[j], type = "n") 
+  
+  x <- seq(min(linpred), max(linpred), length.out = 100) 
+  y.jitter <- jitter(y_values[df2$region_name == region_names[j]], amount = 0.2)
+  
+  for (s in 1:5) {
+    curve(invlogit(a.state[[s]][j] + x), lwd = 0.5, add = TRUE, col = "gray")
+  }
+  curve(invlogit(median(t(a.state)[, j]) + x), lwd = 2, add = TRUE)
+  
+  if (sum(df2$region_name == region_names[j]) > 0) {
+    points(linpred[df2$region_name == region_names[j]], y.jitter)
+  }
+}
+
+title("Figure Nº4: Linear predictor by region", outer = TRUE, line = -1, adj = 0.1, cex.main = 1.6)
+
+
+############################# Visualizations ####################################################
+devtools::install_github("dustinfife/flexplot", ref="development")
+
+model_rslf <- glmer(y_b ~ gse_t + education + female + AGE + avg_educ +  v_prevl  + (1 + gse_t + education|region_name), 
+                    family = binomial(link ="logit"), data = df2)
+
+
+visualize.glmerMod(model_rslf, 
+          plot ="model",
+          formula = y_b ~ gse_t + region_name,
+          samplee =3)
+
+
+# Define the desired region_names
+desired_regions <- c("region metropolitana de santiago", "region del biobio", "region de nuble")
+
+# Subset your data based on the desired region_names
+sample_data <- df2[df2$region_name %in% desired_regions, ]
+
+# Use the subset data in the visualize function
+flexplot::visualize(model_rslf, 
+                    plot = "model",
+                    formula = y_b ~ education + region_name,
+                    sample = 3,
+                    ghost.line ="red")
+
+
+model_rslf <- glmer(y_b ~ gse_t + education + female + AGE + avg_educ +  v_prevl  + (1 + gse_t + education|region_name), 
+                    family = binomial(link ="logit"), data = df2)
+fitted_values <- predict(model_rslf)
+fitted_values <- fitted_values[valid_rows]
+df2 <- df2[valid_rows, ]
+
+
+
+library(ggplot2)
+
+# Filter out missing values
+valid_rows <- complete.cases(fitted_values, df2$gse_t, df2$education, df2$female, df2$AGE, df2$avg_educ, df2$v_prevl, df2$region_name)
+fitted_values <- fitted_values[valid_rows]
+gse_t <- df2$gse_t[valid_rows]
+education <- df2$education[valid_rows]
+female <- df2$female[valid_rows]
+AGE <- df2$AGE[valid_rows]
+avg_educ <- df2$avg_educ[valid_rows]
+v_prevl <- df2$v_prevl[valid_rows]
+region_name <- df2$region_name[valid_rows]
+
+# Create a data frame
+plotdata <- data.frame(
+  fitted = fitted(model_rslf),
+  gse_t = gse_t,
+  education = education,
+  female = female,
+  AGE = AGE,
+  avg_educ = avg_educ,
+  v_prevl = v_prevl,
+  region_name = region_name
+)
+
+library(dplyr)
+library(ggplot2)
+
+# Specify the region names you want to include
+included_regions <- c("region metropolitana de santiago", "region del biobio", "region de los rios")
+
+# Filter the data to include only the specified region names
+filtered_data <- plotdata %>%
+  filter(region_name %in% included_regions)
+
+# Plot
+g1 <- ggplot(filtered_data, aes(x = gse_t, y = fitted, group = region_name, color = as.factor(region_name))) +
+  geom_smooth(method = "lm", se = FALSE, size = 1, na.rm = TRUE) +  # Add na.rm = TRUE to ignore NA values
+  scale_color_discrete(name = "Region") +
+  labs(title = "Varying-intercept, varying-slope (socio-economic status)",
+       x = "Socio-economic status", y = "Predicted probability left candidate") +
+  theme_minimal() +
+  ylim(0, 1)
+print(g1)
+
+
+
+# Plot
+g2 <- ggplot(filtered_data, aes(x = education, y = fitted, group = region_name, color = as.factor(region_name))) +
+  geom_smooth(method = "lm", se = FALSE, size = 1) +
+  scale_color_discrete(name = "Region") +
+  labs(title = "Varying-intercept, varying-slope (education)",
+    x = "education", y = "Predicted probability left candidate") +
+  theme_minimal() +
+  ylim(0, 1)
+
+combined_plot <- grid.arrange(g1, g2, ncol = 2, nrow = 1)
+
+
+
+# Plot 1
+g1 <- ggplot(filtered_data, aes(x = gse_t, y = fitted, group = region_name, color = as.factor(region_name))) +
+  geom_smooth(method = "lm", se = FALSE, size = 1, na.rm = TRUE) +
+  scale_color_discrete(name = "Region") +
+  labs(title = "Figure Nº5: Varying-intercept, varying-slope",
+       y = "Predicted probability left candidate", x = "Socio-economic status") +
+  theme(legend.position = "none") +  
+  ylim(0, 1) +
+  guides(color = FALSE)
+
+# Plot 2
+g2 <- ggplot(filtered_data, aes(x = education, y = fitted, group = region_name, color = as.factor(region_name))) +
+  geom_smooth(method = "lm", se = FALSE, size = 1, na.rm = TRUE) +
+  scale_color_discrete(name = "Region") +
+  labs(
+       y = "Predicted probability left candidate", x = "Education") +
+  theme_minimal() +
+  theme(legend.position = "none") +  
+  ylim(0, 1) 
+
+legend_plot <- ggplot() +
+  theme_void() +
+  theme(legend.position = "bottom") +
+  guides(color = guide_legend(title = "Region"))
+
+combined_plot <- grid.arrange(g1, legend_plot, g2, ncol = 3, widths = c(2, 1, 2))
+
+print(combined_plot)
+
+
+
+
+library(gridExtra)
+
+# Plot 1
+g1 <- ggplot(filtered_data, aes(x = gse_t, y = fitted, group = region_name, color = as.factor(region_name))) +
+  geom_smooth(method = "lm", se = FALSE, size = 1, na.rm = TRUE) +
+  scale_color_discrete(name = "Region") +
+  scale_x_discrete(labels=c("ABC1" = "ABC1", "C2" = "C2",
+                            "C3" = "C3", "D_E"="DE")) + 
+  labs( y = "Predicted probability left candidate", x = "Socio-economic status") +
+  theme_minimal() +
+  ylim(0, 1) +
+  theme( legend.position = "none" )
+
+# Plot 2
+g2 <- ggplot(filtered_data, aes(x = education, y = fitted, group = region_name, color = as.factor(region_name))) +
+  geom_smooth(method = "lm", se = FALSE, size = 1, na.rm = TRUE) +
+  scale_color_discrete(name = "Region") +
+  labs(
+    y ="" , x = "Education") +
+  theme_minimal() +
+  ylim(0, 1) +
+  theme( legend.position = "none" )
+
+
+# Combine plots with the legend between them
+plot <- grid.arrange(g1, g2 , ncol = 2)
+
+# Add a main title
+main_title <- ggdraw() +
+  draw_label("Figure Nº5: Varying-intercept, varying-slope", fontface = "italic", size = 14)
+
+# Arrange the main title and the plot
+final_plot <- plot_grid(main_title, plot, ncol = 1, rel_heights = c(0.1, 1))
+
+# Display the final plot
+final_plot
+
+
+q1 <- ggplot(filtered_data, aes(x = gse_t, y = fitted, group = region_name, color = as.factor(region_name))) +
+  geom_smooth(method = "lm", se = FALSE, size = 1, na.rm = TRUE) +
+  scale_color_discrete(name = "", labels = c("Region: Los Rios", "Region: Biobio", "Region: Metropolitana Santiago")) +
+  theme(legend.key = element_rect(fill = "white"),
+        legend.direction="horizontal",
+        size = 5)
+
+
+legend <- get_legend(q1)                     
+grid.newpage()                               
+grid.draw(legend)  
+
+
+
+# Plot 1
+g10 <- ggplot(plotdata, aes(x = gse_t, y = fitted, group = region_name, color = as.factor(region_name))) +
+  geom_smooth(method = "lm", se = FALSE, size = 1, na.rm = TRUE) +
+  scale_color_discrete(name = "Region") +
+  scale_x_discrete(labels=c("ABC1" = "ABC1", "C2" = "C2",
+                            "C3" = "C3", "D_E"="DE")) + 
+  labs( y = "Predicted probability left candidate", x = "Socio-economic status") +
+  theme_minimal() +
+  ylim(0, 1) +
+  theme( legend.position = "none" )
+
+# Plot 2
+g2 <- ggplot(filtered_data, aes(x = education, y = fitted, group = region_name, color = as.factor(region_name))) +
+  geom_smooth(method = "lm", se = FALSE, size = 1, na.rm = TRUE) +
+  scale_color_discrete(name = "Region") +
+  labs(
+    y ="" , x = "Education") +
+  theme_minimal() +
+  ylim(0, 1) +
+  theme( legend.position = "none" )
+
+
+
+
+
+
+
+
+
+
+

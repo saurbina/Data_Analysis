@@ -1,0 +1,248 @@
+---
+title: "Lab Nº2"
+author: "Sebastian Urbina"
+format: pdf
+editor: visual
+---
+
+```{r}
+#| echo: false
+#| output: false
+library(tidyverse)
+library(tidytext)
+library(ggplot2)
+library(stringr)
+library(SnowballC)
+library(tm)
+library(wordcloud)
+library(lsa)
+library(stargazer)
+library(RTextTools)
+library(topicmodels)
+```
+
+
+### Lab #2 Assignment \~ Conduct Text Analysis
+
+#### 1. Collect some texts.  Compare them in a number of ways.
+I will conduct textual analysis on official presidential speeches from presidents of Chile that differ in their ideologies. By web scraping the speeches from the national library's archives, I gathered substantive textual data from Gabriel Boric (current president) and Sebastian Piñera (former president) - representatives of contrasting political leanings.
+
+An initial notable difference lies in the speech lengths themselves. Boric's speech spanned 46 pages, while Piñera's was shorter at 36 pages. This disparity in length could potentially signify several factors.
+
+Rhetorical Style: Progressive leaders like Boric may favor a more expansive, rhetorical approach to connect with the public, whereas conservative voices like Piñera might tend toward more concise policy/governance messaging.
+
+Breadth of Agenda: The greater length of Boric's speech could indicate a wider-ranging set of priorities and proposals reflecting his activist roots and vision for social transformation.
+
+Audience Engagement: President Boric may have tailored his lengthier speech to galvanize his base with inspirational language, while Piñera's relatively shorter speech suggests a more measured tone appealing to centrist and business constituencies.
+
+However, length alone does not necessarily determine ideological substance. A thorough analysis of word frequencies, topics, sentiments, and linguistic choices is required to unpack the substantive contrasts in these speeches emanating from their different worldviews.
+
+#### 2.You will likely want to have them be “bags of words.”  Prepare the text through removing upper case, white space, punctuation, and consider stemming the words, if appropriate for you purpose. 
+
+```{r}
+# Loading Stopwords in spanish
+spanish_stopwords <- stopwords("spanish")
+stopwords_df <- tibble(word = spanish_stopwords)
+```
+
+```{r}
+#| warning: false
+
+paper_words <- data_frame(file = paste0("/Users/saurbina/Documents/pdf-txt/",
+                                        c("boric_v1.txt", "pinera_V1.txt"))) %>%
+  mutate(text = map(file, read_lines)) %>%
+  unnest() %>%
+  group_by(file = str_sub(basename(file), 1, -5)) %>%
+  mutate(line_number = row_number()) %>%
+  ungroup() %>%
+  unnest_tokens(word, text) %>%
+  anti_join(stopwords_df, by = "word")
+```
+
+#### 3. Generate relative word frequencies for each bag of words, and compare them to each other.
+
+```{r}
+#| warning: false
+#| echo: false
+## count each word per speech
+pw = paper_words[,c("file","word")]
+d = count_(pw, c("file", "word"))
+
+
+## make a document term matrix ##
+pwdtm = d %>%
+  cast_dtm(file, word, n)
+
+## make the dtm into a dataframe ##
+mpwdtm=as.matrix(pwdtm)
+df.mpwdtm=as.data.frame(mpwdtm)
+
+## make the dtm into a tdm instead ##
+t.t = t(mpwdtm)
+
+# make t.t as dataframe 
+df.t.t <- as.data.frame(t.t)
+
+# Create function to calculate relative frequency 
+summing = function(x) x/sum(x, na.rm=T)
+
+df.t.t.2 = apply(df.t.t, 2, summing)
+
+df.t.t$names <- rownames(df.t.t)
+
+df.t.t = as.data.frame(t.t)
+
+df.t.t$names <- rownames(df.t.t)
+
+df.t.t.2 = as.data.frame(df.t.t.2)
+
+df.t.t.2$names <- rownames(df.t.t.2)
+
+df.t.t.2 = as.data.frame(df.t.t.2)
+
+total <- merge(df.t.t, df.t.t.2, by="names")
+
+total$boric.over.pinera = (total$boric_v1.y) - (total$pinera_V1.y)
+
+sort.BOP <- total[order(total$boric.over.pinera, decreasing = TRUE), ]
+
+sort.POB <- total[order(total$boric.over.pinera, decreasing = FALSE), ]
+```
+
+##### Boric over Piñera
+```{r}
+#| warning: false
+#| echo: false
+sort.BOP[1:30, ]
+```
+##### Piñera over Boric
+```{r}
+#| warning: false
+#| echo: false
+sort.POB[1:30, ]
+```
+
+```{r}
+#| warning: false
+#| echo: false
+q = qplot(boric_v1, pinera_V1, data = df.t.t.2)
+q + geom_text(aes(label=names), size = 4.5) 
+```
+
+We can observe significant differences between both speeches. The words most characteristic of Boric, in relation to former President Piñera, are 'discurso' (speech), 'año' (year), 'personas' (people), 'mil' (thousand), and 'quiero' (I want). Conversely, the words most reminiscent of Piñera, relative to President Boric, are 'país' (country), 'sistema' (system), 'calidad' (quality), and 'mejor' (better).
+
+
+#### 4. Articulate what differences (if any) you notice and whether this comports with a theory of why these bags of words should be similar or different.
+
+The differences in word frequencies reveal contrasting rhetorical styles and priorities between the two speeches. President Boric's speech demonstrates a more personal approach, with higher frequencies of words like 'discurso' (speech), 'año' (year), 'personas' (people), 'mil' (thousand), and 'quiero' (want). This suggests a focus on directly addressing and connecting with the people.
+
+In contrast, ex-President Piñera's speech leans towards a more technocratic and policy-oriented rhetoric, evident from the higher relative frequencies of words such as 'país' (country), 'sistema' (system), 'calidad' (quality), and 'mejor' (better). His language seems geared towards discussing national issues, systems, and improvements.
+
+Boric's personal style aims to forge a closer connection with the public by using more relatable language about daily life and aspirations. Piñera, on the other hand, adopts a more detached, institutional approach focused on the functioning of the country as a whole.
+
+These contrasting word frequencies shed light on the differing tones and priorities of the two leaders. While Boric employs a more grassroots-oriented discourse, Piñera maintains a broader, system-level perspective in his speech. Furthermore, the political ideologies reflect different styles and ways of seeing their speeches.
+
+#### 5. Run statistical tests of association between the bags of words (correlation, cosine similarity, regression or Chi-squared), and explain what they indicate.
+
+##### Cosine
+
+```{r}
+# Cosine Correlation
+cosine(t.t)
+```
+First we will implement a cosine similarity measure. After removing stop words and stemming the words, the speeches of Obama and Trump exhibit a cosine similarity of 0.71, indicating a high degree of similarity. One possible hypothesis is that inaugural speeches are solemn occasions, providing valuable insights into the institutionalization of the situation rather than being highly politicized. It is a highly protocol-driven scenario.
+
+
+```{r}
+# Pearson Correlation
+cor(t.t, method="pearson")
+```
+
+Now if we compar the last cosine measure with pearson correlation we see that the  speeches have a Pearson correlation coefficient of 0.67. This is an expected result because Cosine similarity tends to give higher values than Pearson correlation, given that the Pearson correlation coefficient represents the angular separation between two normalized data vectors measured from the mean,  while the cosine similarity measures the angular separation of two data vectors measured from zero.
+
+On the other way  we can do a chi-test to see if the speeches are independet. After stop-words and with stemmed words, a Chi-squared test suggests that president Boric  and ex president Piñera speeches are not independent. A p-value of less than 2.2e-16 indicates an extremely significant result. It suggests that there is a very low probability of observing the observed data under the null hypothesis, assuming no association between the variables being tested. In other words, it provides strong evidence against the null hypothesis and suggests that there is a significant relationship between the variables.
+
+```{r}
+ctable <- table(t.t)
+chisq.test(ctable)
+```
+
+Finally, we will conduct a regression to model how ex-president piñera relative frequency words predict president Boric speech. 
+
+```{r}
+#| warning: false
+#| echo: false
+m2a = lm(boric_v1.y ~ pinera_V1.y , total)
+
+stargazer(m2a, type = "text")
+```
+
+By examining the relative word frequencies used by ex-President Piñera and the words he avoided, we can potentially predict President Boric's word choices with up to 45% greater accuracy. This supports the theory that the rigid, institutionalized format of these official speeches constrains leaders from expressing too much overt political ideology. Instead, they tend to adopt contrasting tones and priorities based on their personal styles and intended audiences.
+
+#### 6. Do one more big thing-- either a sentiment analysis of the bags of words; rerun your analysis but using bigrams and/or trigrams; consider the role of negation words (“not,” “no”, etc.) on your earlier analysis; run a parts of speech tagger; look at the temporal unfolding of your words; or do a topic modelling exercise.  For whichever thing you choose, explain what you are doing and whatever you find makes sense in some way theoretically.
+
+We will conduct a topic modeling analysis of President Boric's speech, incorporating bigrams to provide additional context to our topics. Our approach will utilize Latent Dirichlet Allocation (LDA), one of the most widely used topic modeling methods. In LDA, each document comprises multiple words, and each topic consists of various words associated with it. The objective of LDA is to discern the topics to which a document pertains, guided by the words it contains.
+
+```{r}
+#| warning: false
+#| echo: false
+paper_words <- data_frame(file = paste0("/Users/saurbina/Documents/pdf-txt/",
+                                        c("boric_v1.txt"))) %>%
+  mutate(text = map(file, read_lines)) %>%
+  unnest() %>%
+  group_by(file = str_sub(basename(file), 1, -5)) %>%
+  mutate(line_number = row_number()) %>%
+  ungroup() %>%
+  unnest_tokens(word, text) %>%
+  filter(!grepl("\\d", word)) %>%  
+  anti_join(stopwords_df, by = "word")
+
+
+## count each word per speech
+pw2 = paper_words[,c("file","word")]
+d2= count_(pw2, c("file", "word"))
+
+## make a document term matrix ##
+pwdtm2 = d2 %>%
+  cast_dtm(file, word, n)
+
+# Latent Dirichlet Allocation
+lda <- LDA(pwdtm2, 10)
+terms(lda,10)
+
+```
+
+The emergence of a topic (Topic #1) related to social rights and the government's commitment to them aligns with President Boric's left-leaning, progressive agenda. 
+Simultaneously, the presence of a security-focused topic (Topic #5) suggests that both leaders recognized the importance of addressing law and order, potentially reflecting concerns over social unrest or crime during their respective tenures.
+
+The topic on national development and government structure (Topic #9) points to a shared priority – outlining a vision for the country's future and the role of the administration in achieving it. This overarching topic likely encompasses economic policies, institutional reforms, and long-term planning.
+
+#### 7. Extra credit: do some wordclouds of your texts
+
+```{r}
+set.seed(1234)
+#| warning: false
+#| echo: false
+# Generate word cloud for each speech
+
+#Boric Wordcloud
+suppressWarnings({wordcloud(df.t.t$names, df.t.t$boric_v1, min.freq = 20,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))})
+```
+
+
+```{r, message: false}
+#Piñera Wordcloud
+#| warning: false
+#| echo: false
+
+suppressWarnings({wordcloud(df.t.t$names, df.t.t$pinera_V1, min.freq = 15,
+          max.words=200, random.order=FALSE, rot.per=0.35, 
+          colors=brewer.pal(8, "Dark2"))})
+```
+
+
+
+
+

@@ -1,0 +1,118 @@
+---
+title: "Assignment: Lab Nº3 - ADV. ANALYTIC TECHNIQUES"
+author: "Sebastian Urbina"
+format: pdf
+editor: visual
+---
+
+```{r}
+library(tidyverse)
+library(ggplot2)
+setwd("/Volumes/TOSHIBA EXT/0.1 Thesis/data/output")
+df1 <- read.csv("mset.var_V_01.csv")
+df1 <- df1 %>%
+mutate(AGE = edad)
+
+df1 <- df1 %>%
+  mutate(education = ifelse(esc_nivel_1 == 99, NA, esc_nivel_1))
+
+df1 <- df1 %>%
+mutate(Percentage_k = percentage_k * 100)
+
+df1 <- df1 %>%
+mutate(gse_m = case_when(
+    gse_t == "ABC1" ~ "ABC1-C2",
+    gse_t == "C3" ~ "C3",
+    gse_t == "D_E" ~ "DE",
+    TRUE ~ NA
+  ))
+
+df1 <-  df1 %>%
+  mutate(y_b = case_when(
+    y == 0  ~ 1,
+    y == 1  ~ 0,
+    TRUE ~ NA
+  ))
+
+
+regions_to_exclude <- c('region de arica y parinacota', 'region de tarapaca', 
+                        'region de atacama', 'region de aysen del gral. carlos ibanez del campo', 
+                        'region de magallanes y de la antartica chilena')
+
+df2 <- df1 %>%
+  filter(!(region_name %in% regions_to_exclude))
+```
+
+### 1. First run a naive OLS with clustered standard errors.  Interpret it.  
+
+For the following analysis, I will use a Chilean survey dataset created by the CEP Institute. The universe of the study was all the individuals
+above 17 years old and residents of the country, achieving a sample of 1467 individuals. They interviewed each of them in their homes, and the
+sample method was stratified, random, and probabilistic in each of its three stages. I chose this dataset because it is among the most prestigious public opinion surveys, having high methodological standards.
+
+In this study, we aim to investigate how individual political beliefs are influenced by factors such as sex, age, and presidential vote choice. Furthermore, we seek to examine how regional differences may also affect individual beliefs. To achieve this, we will employ a multilevel analysis approach.
+
+The ideology variable is a scale ranging from 1 to 10, where 1 represents a left-leaning ideology and 10 represents a right-leaning ideology. The gender variable is coded as 1 for female and 0 for male. The presidential vote variable is coded as 1 for those who voted for the left-wing candidate in the 2021 election and 0 for those who voted for the right-wing candidate in the same election. The region variable identifies the region where each respondent resides. Some regions were discarded due to a low response rate in those areas.
+
+
+
+```{r}
+df2 <- df2 %>%
+  mutate(pol = ifelse(iden_pol_2 == 99, NA, iden_pol_2))
+
+df2 <- df2 %>%
+  mutate(pol = ifelse(pol == 88, NA, pol))
+
+
+lm.pol <- lm(pol ~ y_b + female + AGE, data = df2)
+
+clusterSE(fit = lm.pol, cluster.var = "region_name", data = df2)
+```
+Controlling for other factors, individuals who voted for the left-wing candidate in the 2021 election exhibit ideological beliefs that are, on average, 2.4 points lower compared to those who voted for the right-wing candidate. This difference is statistically significant.
+
+### 2. Then run an empty (random intercept) model.  Interpret it.
+```{r}
+null_lm <- lmer(pol ~ (1 | region_name), data = df2, REML = FALSE)
+summary(null_lm )
+rho(null_lm)
+```
+Rho means that 1.21% of the variance in the scale of ideology is between different regions. 
+
+
+### 3. Then run a full random-intercept model.  Interpret that.  
+```{r}
+lmer.pol <- lmer(pol ~ y_b + AGE + female +  (1 | region_name), data = df2, REML = FALSE)
+summary(lmer.pol)
+rho(lmer.pol)
+```
+In the random intercept model, the coefficients are virtually the same as those in the OLS model. The coefficient for voting for the left candidate (y_b) was -2.43 and is now -2.41. The age coefficient was 0.002 and remains unchanged at 0.002. The female coefficient was 0.09 and is now 0.07.
+
+Now, the value of rho implies that only 1.37% of the variance in the ideology scale is due to unobserved differences between communities.
+
+On the other hand, the standard deviation of the region is practically the same at 0.237, meaning that there is a significant amount of variation between states. Moreover, the constant has a mean of 6.716785 and a standard deviation of 0.254.
+
+### 4. Then, lastly, run a random-intercept, random-slope model.  Interpret that. 
+```{r}
+
+lmer.pol <- lmer(pol ~ y_b + AGE + female +  ( y_b| region_name), data = df2, REML = FALSE)
+summary(lmer.pol)
+```
+ 
+For a 0-year-old man who voted for the right-wing candidate, on average, they have a score of 6.68 on the ideology scale. However, there is substantial variation around that mean, with a standard deviation of 0.4006.
+
+On the other hand, on average, people who voted for the left candidate in the 2021 election have a score that is 2.34 points lower on the ideology scale (compared to right-wing voters). Nevertheless, there is substantial variation around that average slope, with a standard deviation of 0.3151.
+
+There is a very high negative correlation (ρ = -0.89) between the constant and the slope for each community.
+
+In conclusion, regions with above-average scores on the ideology scale (in their constant) have below-average values on the slope for voting for the left candidate in the 2021 election – and vice versa. This could be explained by the notion that in some regions, political ideologies may have deeper roots in the territory, which also affects the voting patterns.
+ 
+### 5. Feel free to add in cross-level interactions too.
+
+```{r}
+
+lmer.pol <- lmer(pol ~ y_b*female + AGE  +  (y_b| region_name), data = df2, REML = FALSE)
+summary(lmer.pol)
+```
+For women who voted for the left candidate in the 2021 election, their score on the ideology scale is 0.12 points higher compared to men who voted for the left candidate, holding all other variables constant.
+
+
+

@@ -28,7 +28,7 @@ This project is designed to cover a variety of data analysis techniques, includi
     - **Objective:** Adjust survey data to make it more representative of the population.
     - **Techniques Used:** Weighting adjustments, demographic balancing.
     - **Files:**
-        - ``: Script for implementing poststratification techniques.
-        - ``: Dependencies for poststratification.
+        - `MRP_2020_FV.r`: Script for implementing poststratification techniques.
+
 
 

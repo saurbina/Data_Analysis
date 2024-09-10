@@ -1,5 +1,5 @@
 # Data Analysis Project
-<img src="https://github.com/user-attachments/assets/929e5b6f-9ecb-4358-8a06-330881f36cda" alt="support_graph" width="400"/>
+<img src="https://github.com/user-attachments/assets/929e5b6f-9ecb-4358-8a06-330881f36cda" alt="support_graph" width="600"/>
 
 ## Overview
 

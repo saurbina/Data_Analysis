@@ -1,4 +1,5 @@
 # Data Analysis Project
+<img src="https://github.com/user-attachments/assets/929e5b6f-9ecb-4358-8a06-330881f36cda" alt="support_graph" width="400"/>
 
 ## Overview
 
@@ -24,7 +25,7 @@ This project is designed to cover a variety of data analysis techniques, includi
     - **Files:**
         - `multilevel_models.txt`: Script for performing multilevel regression analysis.
 
-4. **Poststratification** ![support_graph](https://github.com/user-attachments/assets/929e5b6f-9ecb-4358-8a06-330881f36cda)
+4. **Poststratification** 
     - **Objective:** Adjust survey data to make it more representative of the population.
     - **Techniques Used:** Weighting adjustments, demographic balancing.
     - **Files:**
